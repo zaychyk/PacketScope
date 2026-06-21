@@ -1,0 +1,10 @@
+name: net_design
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - pip
+  - pip:
+    - scapy>=2.5.0
+    - pyqt6>=6.6

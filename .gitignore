@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+.codegraph/
+
+# Project docs (not for submission)
+claude.md
+网络课程设计要求.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Screenshots
+swappy-*.png
+
+# Font config残留
+fonts.dir
+fonts.scale
