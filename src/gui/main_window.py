@@ -307,6 +307,10 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Export failed")
 
     def _clear_packets(self) -> None:
+        # 如果正在抓包，先停止
+        if self.is_capturing:
+            self._stop_capture()
+
         self.packets.clear()
         self.filtered_packets.clear()
         self.packet_list.clear()
@@ -315,6 +319,7 @@ class MainWindow(QMainWindow):
         self.stats.reset()
         self.selected_packet_index = None
         self.current_file_path = None
+        self.capture_stats_label.setText("")
         self.setWindowTitle("Network Protocol Analyzer")
         self.status_label.setText("Cleared")
         self._update_packet_count()
