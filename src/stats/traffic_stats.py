@@ -6,7 +6,7 @@ Traffic Statistics Module
 from typing import Optional
 from collections import defaultdict
 from scapy.packet import Packet
-from scapy.layers.l2 import Ether
+from scapy.layers.l2 import Ether, ARP
 from scapy.layers.inet import IP, TCP, UDP, ICMP
 
 from ..parser.base import ParsedPacket, ProtocolType
@@ -76,6 +76,9 @@ class TrafficStats:
 
         if packet.haslayer(Ether):
             protocols.append("Ethernet")
+        if packet.haslayer(ARP):
+            protocols.append("ARP")
+            return protocols  # ARP 帧没有 IP/TCP/UDP 层
         if packet.haslayer(IP):
             protocols.append("IPv4")
         if packet.haslayer(TCP):
@@ -98,6 +101,13 @@ class TrafficStats:
             udp = packet[UDP]
             if udp.dport == 53 or udp.sport == 53:
                 protocols.append("DNS")
+
+        # 检查 IPv6（通过 EtherType）
+        if not protocols or protocols == ["Ethernet"]:
+            if packet.haslayer(Ether):
+                eth_type = packet[Ether].type
+                if eth_type == 0x86DD:
+                    protocols.append("IPv6")
 
         return protocols if protocols else ["Unknown"]
 
