@@ -89,6 +89,8 @@ class MainWindow(QMainWindow):
         # Status bar
         self.status_label = QLabel("Ready")
         self.status_label.setFont(get_font("normal"))
+        self.capture_stats_label = QLabel("")
+        self.capture_stats_label.setFont(get_font("small"))
         self.packet_count_label = QLabel("Packets: 0")
         self.packet_count_label.setFont(get_font("normal"))
         self.packet_count_label.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -96,6 +98,7 @@ class MainWindow(QMainWindow):
         status_bar = QStatusBar()
         self.setStatusBar(status_bar)
         status_bar.addWidget(self.status_label, 1)
+        status_bar.addPermanentWidget(self.capture_stats_label)
         status_bar.addPermanentWidget(self.packet_count_label)
 
     def _on_toolbar_action(self, action: str) -> None:
@@ -235,7 +238,13 @@ class MainWindow(QMainWindow):
             for pkt in added:
                 self.stats.add_packet(pkt)
 
-            self.status_label.setText(f"Capturing... ({len(self.packets)} packets)")
+            # Update capture stats (pps, drop rate)
+            cap_stats = self.capture.get_stats()
+            pps = cap_stats.get("packets_per_second", 0)
+            dropped = cap_stats.get("total_dropped", 0)
+            self.capture_stats_label.setText(f"{pps:.0f} pps | dropped: {dropped}")
+
+            self.status_label.setText(f"Capturing on {self.capture.interface or 'auto'}...")
 
     def _stop_capture(self) -> None:
         if not self.is_capturing or self.capture is None:
@@ -260,6 +269,7 @@ class MainWindow(QMainWindow):
 
             self.setWindowTitle(f"Network Protocol Analyzer - {len(self.packets)} packets")
             self.status_label.setText(f"Capture stopped. {len(self.packets)} packets captured.")
+            self.capture_stats_label.setText("")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error stopping capture:\n{str(e)}")
