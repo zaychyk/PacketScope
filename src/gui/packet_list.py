@@ -36,6 +36,8 @@ class PacketListPanel(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(len(self.COLUMNS))
         self.table.setHorizontalHeaderLabels(self.COLUMNS)
+        self.table.setVerticalHeaderLabels([])  # 隐藏左侧行号
+        self.table.verticalHeader().setVisible(False)
         self.table.setFont(get_font("large"))
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
