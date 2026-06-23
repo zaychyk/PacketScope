@@ -92,9 +92,10 @@ class UDPParser(BaseParser):
         """检查是否可以解析（UDP 首部 8 字节）"""
         return len(packet_data) >= self.HEADER_SIZE
 
-    def get_payload(self, packet_data: bytes, layer: LayerInfo) -> bytes:
-        """获取 UDP 数据报的有效载荷"""
-        return packet_data[self.HEADER_SIZE:]
+    @property
+    def header_length(self) -> int:
+        """UDP 首部固定 8 字节"""
+        return self.HEADER_SIZE
 
     def get_data_length(self, layer: LayerInfo) -> int:
         """获取数据部分长度"""

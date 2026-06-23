@@ -111,6 +111,11 @@ class ICMPParser(BaseParser):
         """检查是否可以解析（ICMP 至少 8 字节）"""
         return len(packet_data) >= self.MIN_HEADER_SIZE
 
+    @property
+    def header_length(self) -> int:
+        """ICMP 首部最小 8 字节"""
+        return self.MIN_HEADER_SIZE
+
     def _parse_echo_fields(self, packet_data: bytes, layer: LayerInfo) -> None:
         """解析 Echo Request/Reply 字段"""
         if len(packet_data) >= 8:

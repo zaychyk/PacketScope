@@ -164,10 +164,10 @@ class TCPParser(BaseParser):
         """检查是否可以解析（TCP 首部至少 20 字节）"""
         return len(packet_data) >= 20
 
-    def get_payload(self, packet_data: bytes, layer: LayerInfo) -> bytes:
-        """获取 TCP 报文段的有效载荷"""
-        header_length = getattr(layer, '_header_length', 20)
-        return packet_data[header_length:]
+    @property
+    def header_length(self) -> int:
+        """TCP 首部长度动态（Data Offset * 4），基础值 20 字节"""
+        return 20
 
     def _parse_flags(self, flags: int) -> str:
         """解析六位标志位"""

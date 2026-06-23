@@ -4,14 +4,12 @@ Real-time Packet Capture Module
 """
 
 import threading
-import time
-from typing import Optional, Callable, Generator
-from collections import deque
+from typing import Optional, Callable
 
-from scapy.all import sniff, conf, AsyncSniffer
+from scapy.all import AsyncSniffer
 from scapy.packet import Packet
 
-from ..parser.base import ParsedPacket
+from .buffer import CaptureBuffer
 
 
 class RealTimeCapture:
@@ -21,11 +19,11 @@ class RealTimeCapture:
     支持:
     - 异步抓包（后台线程）
     - BPF 过滤器
-    - 缓冲区管理
+    - 高性能缓冲区（CaptureBuffer，支持丢包率/pps 统计）
     - 回调通知
     """
 
-    def __init__(self, interface: Optional[str] = None, buffer_size: int = 10000):
+    def __init__(self, interface: Optional[str] = None, buffer_size: int = 50000):
         """
         初始化抓包器
         :param interface: 网卡接口名称（None 表示自动选择）
@@ -33,13 +31,11 @@ class RealTimeCapture:
         """
         self.interface = interface
         self.buffer_size = buffer_size
-        self.buffer: deque[Packet] = deque(maxlen=buffer_size)
+        self.buffer = CaptureBuffer(max_size=buffer_size)
         self.sniffer: Optional[AsyncSniffer] = None
         self.is_running = False
-        self.packet_count = 0
         self.callbacks: list[Callable[[Packet], None]] = []
         self._lock = threading.Lock()
-        self._thread: Optional[threading.Thread] = None
 
     def start(self, bpf_filter: str = "") -> bool:
         """
@@ -52,9 +48,7 @@ class RealTimeCapture:
 
         try:
             def packet_callback(packet: Packet):
-                with self._lock:
-                    self.buffer.append(packet)
-                    self.packet_count += 1
+                self.buffer.add(packet)
                 for cb in self.callbacks:
                     try:
                         cb(packet)
@@ -85,8 +79,7 @@ class RealTimeCapture:
 
         self.sniffer.stop()
         self.is_running = False
-        packets = list(self.buffer)
-        return packets
+        return self.buffer.get()
 
     def get_packets(self, count: Optional[int] = None) -> list[Packet]:
         """
@@ -94,16 +87,11 @@ class RealTimeCapture:
         :param count: 获取数量（None 表示全部）
         :return: 数据包列表
         """
-        with self._lock:
-            if count is None:
-                return list(self.buffer)
-            return list(self.buffer)[-count:]
+        return self.buffer.get(count)
 
     def clear_buffer(self) -> None:
         """清空缓冲区"""
-        with self._lock:
-            self.buffer.clear()
-            self.packet_count = 0
+        self.buffer.clear()
 
     def add_callback(self, callback: Callable[[Packet], None]) -> None:
         """添加数据包回调函数"""
@@ -115,13 +103,19 @@ class RealTimeCapture:
             self.callbacks.remove(callback)
 
     def get_stats(self) -> dict:
-        """获取抓包统计信息"""
+        """获取抓包统计信息（含丢包率、pps 等）"""
+        buf_stats = self.buffer.get_stats()
         return {
             "is_running": self.is_running,
             "interface": self.interface or "auto",
-            "packet_count": self.packet_count,
-            "buffer_size": len(self.buffer),
-            "max_buffer": self.buffer_size,
+            "packet_count": buf_stats["total_received"],
+            "buffer_size": buf_stats["current_size"],
+            "max_buffer": buf_stats["max_size"],
+            "total_received": buf_stats["total_received"],
+            "total_dropped": buf_stats["total_dropped"],
+            "drop_rate": buf_stats["drop_rate"],
+            "elapsed_time": buf_stats["elapsed_time"],
+            "packets_per_second": buf_stats["packets_per_second"],
         }
 
     @staticmethod

@@ -45,33 +45,39 @@ class DetailViewPanel(QWidget):
         raw_data = bytes(packet)
         offset = 0
 
+        # 创建解析器实例（复用，避免重复创建）
+        eth_parser = EthernetParser()
+        ip_parser = IPv4Parser()
+        tcp_parser = TCPParser()
+        udp_parser = UDPParser()
+        icmp_parser = ICMPParser()
+
         if packet.haslayer("Ethernet"):
-            eth_layer = EthernetParser().parse(raw_data[offset:])
+            eth_layer = eth_parser.parse(raw_data[offset:])
             if eth_layer:
                 self._add_layer_to_tree(eth_layer, "Ethernet II")
-                offset = 14
+                offset += eth_parser.get_header_length(eth_layer)
 
         if packet.haslayer("IP"):
-            ip_layer = IPv4Parser().parse(raw_data[offset:])
+            ip_layer = ip_parser.parse(raw_data[offset:])
             if ip_layer:
                 self._add_layer_to_tree(ip_layer, "Internet Protocol Version 4")
-                ip_header_len = (raw_data[offset] & 0x0F) * 4
-                offset += ip_header_len
+                offset += ip_parser.get_header_length(ip_layer)
 
         if packet.haslayer("TCP"):
-            tcp_layer = TCPParser().parse(raw_data[offset:])
+            tcp_layer = tcp_parser.parse(raw_data[offset:])
             if tcp_layer:
                 self._add_layer_to_tree(tcp_layer, "Transmission Control Protocol")
-                tcp_header_len = ((raw_data[offset + 12] >> 4) & 0x0F) * 4
-                offset += tcp_header_len
+                offset += tcp_parser.get_header_length(tcp_layer)
 
         if packet.haslayer("UDP"):
-            udp_layer = UDPParser().parse(raw_data[offset:])
+            udp_layer = udp_parser.parse(raw_data[offset:])
             if udp_layer:
                 self._add_layer_to_tree(udp_layer, "User Datagram Protocol")
+                offset += udp_parser.get_header_length(udp_layer)
 
         if packet.haslayer("ICMP"):
-            icmp_layer = ICMPParser().parse(raw_data[offset:])
+            icmp_layer = icmp_parser.parse(raw_data[offset:])
             if icmp_layer:
                 self._add_layer_to_tree(icmp_layer, "Internet Control Message Protocol")
 

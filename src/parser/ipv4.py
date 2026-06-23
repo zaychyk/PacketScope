@@ -33,7 +33,6 @@ class IPv4Parser(BaseParser):
     PROTOCOL_ICMP = 1
     PROTOCOL_TCP = 6
     PROTOCOL_UDP = 17
-    PROTOCOL_IPV6 = 41
 
     # 标志位
     FLAG_RESERVED = 0x04  # 保留位
@@ -206,6 +205,11 @@ class IPv4Parser(BaseParser):
         version = (packet_data[0] >> 4) & 0x0F
         return version == 4
 
+    @property
+    def header_length(self) -> int:
+        """IPv4 首部长度动态（IHL * 4），基础值 20 字节"""
+        return 20
+
     def get_next_parser_type(self, layer: LayerInfo) -> Optional[ProtocolType]:
         """根据协议号返回下一层解析器类型"""
         protocol = getattr(layer, '_protocol', None)
@@ -218,11 +222,6 @@ class IPv4Parser(BaseParser):
             self.PROTOCOL_ICMP: ProtocolType.ICMP,
         }
         return mapping.get(protocol)
-
-    def get_payload(self, packet_data: bytes, layer: LayerInfo) -> bytes:
-        """获取 IPv4 数据报的有效载荷"""
-        header_length = getattr(layer, '_header_length', 20)
-        return packet_data[header_length:]
 
     def _parse_flags(self, flags: int) -> str:
         """解析标志位"""
@@ -242,11 +241,9 @@ class IPv4Parser(BaseParser):
             2: "IGMP",
             6: "TCP",
             17: "UDP",
-            41: "IPv6",
             47: "GRE",
             50: "ESP",
             51: "AH",
-            58: "ICMPv6",
             89: "OSPF",
             132: "SCTP",
         }

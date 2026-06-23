@@ -13,11 +13,9 @@ class ProtocolType(Enum):
     """协议类型枚举"""
     ETHERNET = "Ethernet"
     IPv4 = "IPv4"
-    IPv6 = "IPv6"
     TCP = "TCP"
     UDP = "UDP"
     ICMP = "ICMP"
-    ARP = "ARP"
     UNKNOWN = "Unknown"
 
 
@@ -88,7 +86,27 @@ class BaseParser:
     def __init__(self):
         self.name = "BaseParser"
 
-    def parse(self, packet_data: bytes, previous_layer: Optional[LayerInfo] = None) -> Optional[LayerInfo]:
+    @property
+    def header_length(self) -> int:
+        """协议首部长度（字节）。子类可重写。动态长度（如 IPv4/TCP）设为 0。"""
+        return 0
+
+    def get_header_length(self, layer: Optional['LayerInfo'] = None) -> int:
+        """
+        获取已解析层的实际首部长度。
+        对于固定长度协议直接返回 header_length；
+        对于动态长度协议（IPv4/TCP）从 layer._header_length 读取。
+        """
+        if layer is not None and hasattr(layer, '_header_length'):
+            return layer._header_length
+        return self.header_length
+
+    def get_payload(self, packet_data: bytes, layer: Optional['LayerInfo'] = None) -> bytes:
+        """获取有效载荷（去除首部后的数据）"""
+        hdr_len = self.get_header_length(layer)
+        return packet_data[hdr_len:]
+
+    def parse(self, packet_data: bytes, previous_layer: Optional['LayerInfo'] = None) -> Optional['LayerInfo']:
         """
         解析协议数据
         :param packet_data: 原始字节数据
