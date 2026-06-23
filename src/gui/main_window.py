@@ -284,8 +284,8 @@ class MainWindow(QMainWindow):
         file_path = save_file(
             self,
             title="Export Packets",
-            filetypes=[("Text files", "*.txt"), ("Hex files", "*.hex"), ("PCAP files", "*.pcap"), ("All files", "*.*")],
-            defaultextension=".txt",
+            filetypes=[("PCAP files", "*.pcap"), ("Hex dump", "*.txt"), ("Hex files", "*.hex"), ("All files", "*.*")],
+            defaultextension=".pcap",
         )
 
         if not file_path:
@@ -296,9 +296,11 @@ class MainWindow(QMainWindow):
 
             if file_path.endswith('.pcap'):
                 PcapFileReader.save_packets(packets_to_export, file_path)
+            elif file_path.endswith('.hex'):
+                HexExporter.export_packets(packets_to_export, file_path, format="hex")
             else:
-                export_format = "hex" if file_path.endswith('.hex') else "hex_dump"
-                HexExporter.export_packets(packets_to_export, file_path, format=export_format)
+                # .txt 和其他格式使用 hex_dump
+                HexExporter.export_packets(packets_to_export, file_path, format="hex_dump")
 
             self.status_label.setText(f"Exported {len(packets_to_export)} packets to {file_path}")
 
@@ -310,6 +312,11 @@ class MainWindow(QMainWindow):
         # 如果正在抓包，先停止
         if self.is_capturing:
             self._stop_capture()
+
+        # 清空抓包缓冲区
+        if self.capture:
+            self.capture.clear_buffer()
+            self.capture = None
 
         self.packets.clear()
         self.filtered_packets.clear()
