@@ -23,6 +23,8 @@ class FilterBar(QWidget):
         "HTTPS": "tcp port 443",
         "DNS": "udp port 53",
         "SSH": "tcp port 22",
+        "FTP": "tcp port 21",
+        "SMTP": "tcp port 25",
     }
 
     def __init__(self, parent: QWidget):

@@ -75,7 +75,21 @@ class PacketListPanel(QWidget):
                 tcp = packet[TCP]
                 info["source"] = f"{ip.src}:{tcp.sport}"
                 info["destination"] = f"{ip.dst}:{tcp.dport}"
-                info["protocol"] = "TCP"
+
+                # 应用层协议识别
+                if tcp.dport == 80 or tcp.sport == 80:
+                    info["protocol"] = "HTTP"
+                elif tcp.dport == 443 or tcp.sport == 443:
+                    info["protocol"] = "HTTPS"
+                elif tcp.dport == 22 or tcp.sport == 22:
+                    info["protocol"] = "SSH"
+                elif tcp.dport == 21 or tcp.sport == 21:
+                    info["protocol"] = "FTP"
+                elif tcp.dport == 25 or tcp.sport == 25:
+                    info["protocol"] = "SMTP"
+                else:
+                    info["protocol"] = "TCP"
+
                 flags = []
                 if tcp.flags.S: flags.append("SYN")
                 if tcp.flags.A: flags.append("ACK")
@@ -87,7 +101,20 @@ class PacketListPanel(QWidget):
                 udp = packet[UDP]
                 info["source"] = f"{ip.src}:{udp.sport}"
                 info["destination"] = f"{ip.dst}:{udp.dport}"
-                info["protocol"] = "UDP"
+
+                # 应用层协议识别（优先检查目的端口）
+                if udp.dport == 53:
+                    info["protocol"] = "DNS"
+                elif udp.dport == 67 or udp.dport == 68:
+                    info["protocol"] = "DHCP"
+                elif udp.dport == 69:
+                    info["protocol"] = "TFTP"
+                elif udp.sport == 53:
+                    # DNS 响应（源端口是 53）
+                    info["protocol"] = "DNS"
+                else:
+                    info["protocol"] = "UDP"
+
                 info["info"] = f"Len={udp.len}"
 
             elif packet.haslayer(ICMP):
