@@ -16,14 +16,13 @@ class FilterBar(QWidget):
 
     PRESETS = {
         "(No Filter)": "",
+        "TCP": "tcp",
+        "UDP": "udp",
+        "ICMP": "icmp",
         "HTTP": "tcp port 80",
         "HTTPS": "tcp port 443",
         "DNS": "udp port 53",
         "SSH": "tcp port 22",
-        "ICMP": "icmp",
-        "ARP": "arp",
-        "TCP": "tcp",
-        "UDP": "udp",
     }
 
     def __init__(self, parent: QWidget):

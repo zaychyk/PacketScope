@@ -3,19 +3,22 @@ BPF Filter Module
 BPF 语法数据包过滤
 """
 
-from typing import Optional
+import re
+from typing import Optional, Callable
 from scapy.packet import Packet
+from scapy.layers.l2 import Ether, ARP
+from scapy.layers.inet import IP, TCP, UDP, ICMP
 
 
 class BPFFilter:
     """
     BPF 过滤器
 
-    支持标准 BPF 语法，例如:
-    - "tcp port 80"
+    支持常用 BPF 过滤语法：
+    - "tcp" / "udp" / "icmp" / "arp"
+    - "tcp port 80" / "udp port 53"
+    - "port 80" (TCP 或 UDP)
     - "host 192.168.1.1"
-    - "icmp"
-    - "tcp[tcpflags] & (tcp-syn|tcp-fin) != 0"
     """
 
     # 常用过滤器预设
@@ -25,11 +28,8 @@ class BPFFilter:
         "dns": "udp port 53",
         "ssh": "tcp port 22",
         "icmp": "icmp",
-        "arp": "arp",
         "tcp": "tcp",
         "udp": "udp",
-        "broadcast": "ether broadcast",
-        "multicast": "ether multicast",
     }
 
     def __init__(self, filter_expr: str = ""):
@@ -40,42 +40,87 @@ class BPFFilter:
         self.filter_expr = filter_expr
         self._is_valid = True
         self._error_msg = ""
+        self._matcher: Optional[Callable[[Packet], bool]] = None
 
         if filter_expr:
-            self.validate()
+            self._compile()
+
+    def _compile(self) -> None:
+        """编译过滤器表达式为匹配函数"""
+        expr = self.filter_expr.strip().lower()
+
+        if not expr:
+            self._matcher = None
+            return
+
+        try:
+            self._matcher = self._build_matcher(expr)
+            self._is_valid = True
+            self._error_msg = ""
+        except Exception as e:
+            self._is_valid = False
+            self._error_msg = str(e)
+            self._matcher = None
+
+    def _build_matcher(self, expr: str) -> Callable[[Packet], bool]:
+        """构建匹配函数"""
+        # tcp port X
+        m = re.match(r'^tcp\s+port\s+(\d+)$', expr)
+        if m:
+            port = int(m.group(1))
+            return lambda p: p.haslayer(TCP) and (p[TCP].sport == port or p[TCP].dport == port)
+
+        # udp port X
+        m = re.match(r'^udp\s+port\s+(\d+)$', expr)
+        if m:
+            port = int(m.group(1))
+            return lambda p: p.haslayer(UDP) and (p[UDP].sport == port or p[UDP].dport == port)
+
+        # port X (TCP or UDP)
+        m = re.match(r'^port\s+(\d+)$', expr)
+        if m:
+            port = int(m.group(1))
+            return lambda p: (
+                (p.haslayer(TCP) and (p[TCP].sport == port or p[TCP].dport == port)) or
+                (p.haslayer(UDP) and (p[UDP].sport == port or p[UDP].dport == port))
+            )
+
+        # host X.X.X.X
+        m = re.match(r'^host\s+([\d.]+)$', expr)
+        if m:
+            host = m.group(1)
+            return lambda p: p.haslayer(IP) and (p[IP].src == host or p[IP].dst == host)
+
+        # Simple protocol names
+        if expr == "tcp":
+            return lambda p: p.haslayer(TCP)
+        if expr == "udp":
+            return lambda p: p.haslayer(UDP)
+        if expr == "icmp":
+            return lambda p: p.haslayer(ICMP)
+        if expr == "arp":
+            return lambda p: p.haslayer(ARP)
+        if expr == "ip" or expr == "ipv4":
+            return lambda p: p.haslayer(IP)
+        if expr == "ether" or expr == "ethernet":
+            return lambda p: p.haslayer(Ether)
+
+        raise ValueError(f"Unsupported filter expression: {expr}")
 
     def validate(self) -> bool:
         """
         验证 BPF 过滤器语法
         :return: 是否有效
         """
-        if not self.filter_expr:
-            self._is_valid = True
-            return True
-
-        try:
-            # 尝试用 scapy 验证过滤器语法
-            from scapy.all import compile_filter as _compile
-            self._is_valid = True
-            self._error_msg = ""
-            return True
-        except ImportError:
-            # scapy 没有 compile_filter，尝试用其他方式验证
-            # 简单检查：如果过滤器不为空，假定它有效（实际使用时会验证）
-            self._is_valid = True
-            self._error_msg = ""
-            return True
-        except Exception as e:
-            self._is_valid = False
-            self._error_msg = str(e)
-            return False
+        return self._is_valid
 
     def compile(self) -> bool:
         """
-        编译 BPF 过滤器（兼容性方法）
+        编译 BPF 过滤器
         :return: 是否编译成功
         """
-        return self.validate()
+        self._compile()
+        return self._is_valid
 
     def match(self, packet: Packet) -> bool:
         """
@@ -83,18 +128,13 @@ class BPFFilter:
         :param packet: 数据包
         :return: 是否匹配
         """
-        if not self.filter_expr or not self._is_valid:
+        if not self.filter_expr or not self._is_valid or self._matcher is None:
             return True
 
         try:
-            # 使用 Scapy 的 matches 方法
-            return packet.matches(self.filter_expr)
+            return self._matcher(packet)
         except Exception:
-            # 回退：尝试用 filter 方法
-            try:
-                return packet.filter(self.filter_expr)
-            except Exception:
-                return False
+            return False
 
     def filter_packets(self, packets: list[Packet]) -> list[Packet]:
         """
@@ -111,7 +151,7 @@ class BPFFilter:
         """检查过滤器是否有效"""
         return self._is_valid
 
-    def get_error(self) -> str:
+    def get_error(self) -> bool:
         """获取编译错误信息"""
         return self._error_msg
 
@@ -129,6 +169,7 @@ class BPFFilter:
         self.filter_expr = ""
         self._is_valid = True
         self._error_msg = ""
+        self._matcher = None
 
     @classmethod
     def from_preset(cls, preset_name: str) -> "BPFFilter":
